@@ -170,7 +170,7 @@ export default class Bot {
     if (!this._browser) return;
 
     const page: Page = await this._browser.newPage();
-    page.setDefaultNavigationTimeout(60 * 1000);
+    page.setDefaultNavigationTimeout(120 * 1000);
 
     let spinner = new Spinner(`\t. Navigating to the file(${file.name})...`);
 
