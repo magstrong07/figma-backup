@@ -195,10 +195,13 @@ export default class Bot {
     const client = await page.target().createCDPSession();
     await client.send("Page.setDownloadBehavior", {
       behavior: "allow",
-      downloadPath: path.join(
+      downloadPath: path.resolve(
         BACKUP_DIR,
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        SESSION_DATA.date!.toISOString(),
+        SESSION_DATA.date!.toISOString()
+          .replace(/T/, " ")
+          .replace(/\..+/, "")
+          .replace(/:/g, "-"),
         projectName
       )
     });
@@ -229,7 +232,9 @@ export default class Bot {
       id: file.key
     }));
 
-    for (const file of files) await this._backupFile(file, projectName);
+    for (const file of files) {
+      await this._backupFile(file, projectName);
+    }
   }
 
   private async _backupProjects(): Promise<void> {

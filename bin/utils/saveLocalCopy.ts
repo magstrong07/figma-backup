@@ -2,6 +2,7 @@ import chalk from "chalk";
 import clui from "clui";
 import { KeyInput, Page } from "puppeteer";
 import { log, wait } from ".";
+import { promises as fs } from "fs";
 
 const { Spinner } = clui;
 
@@ -51,11 +52,19 @@ const saveLocalCopy = async (
     await page.waitForSelector("[class*='quick_actions--result']", {
       timeout: interactionDelay
     });
+    log(chalk.red("\t\t.") + chalk.bold(` скачивание началось `));
   } catch {
     chalk.bold.red("\t\tERR. Couldn't find the download command.");
+    log(chalk.red("\t\t.") + chalk.bold(` файл нельзя скачать `));
+    const url = page.url();
+
+    await fs.appendFile(
+      "figma-backup-root/fail_download.txt",
+      file.name + "\n" + url + "\n \n"
+    );
 
     await wait(interactionDelay);
-    await page.close();
+    // await page.close();
   }
 
   log(chalk.red("\t\t.") + chalk.bold(` Execute the download command...`));
