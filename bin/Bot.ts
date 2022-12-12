@@ -241,7 +241,7 @@ export default class Bot {
     if (!this._browser) return;
 
     const page = (await this._browser.pages())[0];
-    page.setDefaultNavigationTimeout(60 * 1000);
+    page.setDefaultNavigationTimeout(120 * 1000);
 
     try {
       await this._authenticate(page);
