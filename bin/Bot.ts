@@ -14,7 +14,6 @@ import {
   saveLocalCopy,
   submitLoginForm,
   timer,
-  wait,
   waitAndNavigate,
   waitForRedirects
 } from "./utils";
@@ -89,22 +88,22 @@ export default class Bot {
   }
 
   private async _login(page: Page): Promise<void> {
-    let spinner = new Spinner("\t. Navigating to the login page...");
+    const spinner = new Spinner("\t. Navigating to the login page...");
 
     spinner.start();
     await waitAndNavigate(page, page.goto("https://www.figma.com/login"));
     spinner.stop();
 
-    const checkRecent = () =>
-      page.url().includes("https://www.figma.com/files/recent");
+    const checkRecent = (url: string) =>
+      url.includes("https://www.figma.com/files") && url.includes("/recent");
 
-    if (checkRecent()) {
+    if (checkRecent(page.url())) {
       log(chalk.red("\t.") + chalk.bold(` Bot is already logged in.`));
       return;
     }
 
     try {
-      spinner = new Spinner("\t. Submitting the login form...");
+      spinner.message("\t. Submitting the login form...");
 
       spinner.start();
       await waitAndNavigate(
@@ -119,7 +118,8 @@ export default class Bot {
       throw new AuthorizationError(e as Error);
     }
 
-    if (checkRecent()) {
+    const pageUrl = page.url();
+    if (checkRecent(pageUrl)) {
       log(chalk.red("\t.") + chalk.bold(` Bot successfully logged in.`));
 
       if (this._cookiesProvider) {
@@ -129,13 +129,11 @@ export default class Bot {
         SESSION_DATA.cookies = cookies;
         await this._cookiesProvider.setCookies(cookies);
       }
-    } else if (page.url() === "https://www.figma.com/login") {
+    } else if (pageUrl === "https://www.figma.com/login") {
       const error = await parseLoginFormError(page);
       throw new AuthorizationError(error || "unknown error");
     } else {
-      throw new AuthorizationError(
-        `Unexpectedly redirected to "${page.url()}"`
-      );
+      throw new AuthorizationError(`Unexpectedly redirected to "${pageUrl}"`);
     }
   }
 
@@ -151,10 +149,11 @@ export default class Bot {
 
       if (!cookies) throw new Error("No cached cookies found.");
 
-      log(chalk.red("\t.") + chalk.bold(` Restoring the cached cookies...`));
+      log(chalk.red("\t.") + chalk.bold(` Setting the cached cookies...`));
       await page.setCookie(...cookies);
 
       const spinner = new Spinner("\t. Waiting for the redirection...");
+
       spinner.start();
       await waitForRedirects(page);
       spinner.stop();
@@ -172,25 +171,23 @@ export default class Bot {
     const page: Page = await this._browser.newPage();
     page.setDefaultNavigationTimeout(120 * 1000);
 
-    let spinner = new Spinner(`\t. Navigating to the file(${file.name})...`);
+    const spinner = new Spinner(`\t. Navigating to the file(${file.name})...`);
 
-    log(chalk.red(">") + chalk.bold(` Backuping the file(${file.name})...`));
+    log(chalk.red(">") + chalk.bold(` Backing up the file(${file.name})...`));
 
     spinner.start();
     await waitAndNavigate(page, goToFilePage(page, file.id));
     spinner.stop();
 
-    spinner = new Spinner("\t. Waiting for the page to be loaded...");
+    spinner.message("\t. Waiting for the page to be loaded...");
 
     spinner.start();
-    await wait(this._interactionDelay);
     await page.waitForFunction(
       () => !document.querySelector('[class*="progress_bar--outer"]')
     );
     spinner.stop();
 
-    log(chalk.red("\t.") + chalk.bold(` Setting the download behaviour...`));
-    await wait(this._interactionDelay);
+    log(chalk.red("\t.") + chalk.bold(` Setting the download behavior...`));
 
     const client = await page.target().createCDPSession();
     await client.send("Page.setDownloadBehavior", {
@@ -248,9 +245,8 @@ export default class Bot {
 
       for (const projectId of this._projectsIds)
         await this._backupProject(projectId);
-    } catch (e) {
-      await this.stop();
-      throw new BackupError(e as Error);
+    } catch (err) {
+      throw new BackupError(<Error>err);
     }
   }
 
@@ -258,9 +254,12 @@ export default class Bot {
     const isRootUser = !!(process.getuid?.() === 0);
     const isWindows = process.platform === "win32";
 
+    const ownArgs = ["--disable-dev-shm-usage"];
+    const rootUserArgs = [...ownArgs, "--no-sandbox"];
+
     this._browser = await puppeteer.launch({
       headless: !this._debug,
-      args: isRootUser ? ["--no-sandbox"] : undefined,
+      args: isRootUser ? rootUserArgs : ownArgs,
       ignoreDefaultArgs: isWindows ? ["--disable-extensions"] : undefined
     });
 
@@ -274,17 +273,25 @@ export default class Bot {
 
     log(chalk.red.bold(" Starting the backup task..."));
     _timer.start();
-    await this._backupProjects();
-    log(
-      chalk.red.bold(`Backup task finished! (time elapsed: ${_timer.end()}s)`)
-    );
-    await this.stop();
+    try {
+      await this._backupProjects();
+      log(
+        chalk.red.bold(`Backup task finished! (time elapsed: ${_timer.end()}s)`)
+      );
+    } catch (err) {
+      log(chalk.bold.red(`ERR. ${(<Error>err).message}`));
+    } finally {
+      await this.stop();
+    }
   }
 
   public async stop(): Promise<void> {
     log(chalk.red(">") + chalk.bold(" Stopping the bot..."));
 
-    if (this._browser) await this._browser.close();
-    this._browser = null;
+    try {
+      if (this._browser) await this._browser.close();
+    } finally {
+      this._browser = null;
+    }
   }
 }
