@@ -25,7 +25,7 @@ export interface IAuthData {
   email: string;
   password: string;
 }
-
+// моя версия
 export interface IBotOptions {
   authData: IAuthData;
   projectsIds: string[];
