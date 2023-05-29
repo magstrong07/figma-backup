@@ -1,12 +1,11 @@
 import chalk from "chalk";
 import clui from "clui";
-import { KeyInput, Page } from "puppeteer";
+import { Page } from "puppeteer";
 
 import { promises as fs } from "fs";
 
 import log from "./log";
 import wait from "./wait";
-
 
 const { Spinner } = clui;
 
@@ -21,39 +20,24 @@ const saveLocalCopy = async (
   file: { name: string; id: string },
   init: Init
 ) => {
-  const { interactionDelay, typingDelay, downloadTimeout } = init;
+  const { interactionDelay, downloadTimeout } = init;
 
   log(
     chalk.red("\t\t.") + chalk.bold(` Opening up the figma command palette...`)
   );
 
-  const MainKeyInput: KeyInput =
-    process.platform === "darwin" ? "Meta" : "Control";
-
-  await page.keyboard.down(MainKeyInput);
-  await page.keyboard.press("KeyP");
-  await page.keyboard.up(MainKeyInput);
-
+  log(chalk.red("\t\t.") + chalk.bold(`скачиваем через меню`));
+  await page.waitForSelector('[id="toggle-menu-button"]');
+  await page.click('[id="toggle-menu-button"]');
+  await page.waitForSelector('[data-testid="dropdown-option-File"]');
+  await page.click('[data-testid="dropdown-option-File"]');
   try {
-    await page.waitForSelector("[class*='quick_actions--search']", {
-      timeout: interactionDelay
-    });
-  } catch {
-    log(chalk.bold.red("\t\tERR. Couldn't open the figma command palette."));
-
-    await wait(interactionDelay);
-    await page.close();
-  }
-
-  log(chalk.red("\t\t.") + chalk.bold(` Typing down the download command...`));
-  await page.keyboard.type("save local copy", { delay: typingDelay });
-
-  try {
-    await page.waitForSelector("[class*='quick_actions--result']", {
-      timeout: interactionDelay
-    });
-    log(chalk.red("\t\t.") + chalk.bold(` скачивание началось `));
-  } catch {
+    await page.waitForSelector(
+      '[data-testid="dropdown-option-Save local copy…"]'
+    );
+    await page.click('[data-testid="dropdown-option-Save local copy…"]');
+    log(chalk.bold.red("скачивание началось"));
+  } catch (e) {
     chalk.bold.red("\t\tERR. Couldn't find the download command.");
     log(chalk.red("\t\t.") + chalk.bold(` файл нельзя скачать `));
     const url = page.url();
@@ -66,11 +50,7 @@ const saveLocalCopy = async (
     log(chalk.bold.red("\t\tERR. Couldn't find the download command."));
 
     await wait(interactionDelay);
-    // await page.close();
   }
-
-  log(chalk.red("\t\t.") + chalk.bold(` Execute the download command...`));
-  await page.keyboard.press("Enter");
 
   const spinner = new Spinner("\t\t. Waiting for the file to be downloaded...");
 
