@@ -70,7 +70,7 @@ export default class Bot {
       projectsIds,
       figmaAccessToken,
       debug = false,
-      downloadTimeout = 30 * 1000,
+      downloadTimeout = 60 * 1000,
       interactionDelay = 2000,
       typingDelay = 100
     } = options;
@@ -176,8 +176,14 @@ export default class Bot {
     log(chalk.red(">") + chalk.bold(` Backing up the file(${file.name})...`));
 
     spinner.start();
-    await waitAndNavigate(page, goToFilePage(page, file.id));
-    spinner.stop();
+    try {
+      page.setDefaultNavigationTimeout(120000);
+      await waitAndNavigate(page, goToFilePage(page, file.id));
+      spinner.stop();
+    } catch (e) {
+      spinner.message("\t. перезагрузка страницы");
+      await page.reload({ waitUntil: ["networkidle0", "domcontentloaded"] });
+    }
 
     spinner.message("\t. Waiting for the page to be loaded...");
 
